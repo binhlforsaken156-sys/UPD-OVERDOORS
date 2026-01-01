@@ -216,4 +216,3 @@ safeLoad("https://raw.githubusercontent.com/Junbbinopro/Guiding-light-candle/ref
 -- ===========================
 -- Final log
 -- ===========================
-warn("[OVERDOORS COMBINED] Loaded. Hardcore caption retained (except 'Impossible'). Candle OK. Speed=20. Dark cartoon shader applied.")
