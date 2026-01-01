@@ -1,214 +1,357 @@
--- OVERDOORS HARD MODE + CARTOON SHADER (COMBINED)
--- Hardcore + Entities + Candle + Cartoon shader (low-lag dark variant)
--- Giữ Hardcore caption (trừ "Impossible"), Guiding Light Candle, Speed=20
--- Bằng: chu be te liet + fix
-
-if getgenv().OVERDOORS_COMBINED_LOADED then return end
-getgenv().OVERDOORS_COMBINED_LOADED = true
+-- overdoors-hardcore-combined.lua
+-- COMBINED PACK: OVERDOORS HARDCORE + ENTITIES + INTRO + VIOLET MUSIC + SPEED/DARK FIX
+-- by: chu be te liet (combined by assistant)
+-- Notes: Place this file on your GitHub and run via loadstring(game:HttpGet("URL"))()
 
 -- Services
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local LP = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
 
--- Safe http/load helpers
-local function safeHttpGet(url)
-    local ok, res = pcall(function() return game:HttpGet(url) end)
-    if ok and type(res) == "string" and #res > 10 then return res end
-    return nil
+local localPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- 0) SAFEGUARD: prevent multiple runs
+--------------------------------------------------
+if _G.OVERDOORS_COMBINED_LOADED then
+    -- already loaded
+    return
+end
+_G.OVERDOORS_COMBINED_LOADED = true
+
+--------------------------------------------------
+-- 1) REMOVE CARTOON / POST EFFECTS (fully)
+--------------------------------------------------
+do
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("PostEffect")
+        or v:IsA("Atmosphere")
+        or v:IsA("ColorCorrectionEffect")
+        or v:IsA("BloomEffect")
+        or v:IsA("SunRaysEffect")
+        or v:IsA("DepthOfFieldEffect") then
+            pcall(function() v:Destroy() end)
+        end
+    end
 end
 
-local function safeLoad(url)
-    local src = safeHttpGet(url)
-    if not src then return end
-    pcall(function() loadstring(src)() end)
+--------------------------------------------------
+-- 2) MAKE GAME DARKER (configurable)
+--------------------------------------------------
+do
+    -- darker settings (you can tweak)
+    Lighting.Ambient = Color3.new(0,0,0)
+    Lighting.Brightness = 0.05
+    Lighting.ClockTime = 20
+    Lighting.FogStart = 20
+    Lighting.FogEnd = 60
+    Lighting.FogColor = Color3.new(0,0,0)
+    Lighting.GlobalShadows = true
+    -- keep subtle exposure low
+    pcall(function() Lighting.ExposureCompensation = -0.5 end)
 end
 
--- ===========================
--- Remove existing post effects to reduce lag (and atmospheres)
--- ===========================
+--------------------------------------------------
+-- 3) REMOVE IMPOSSIBLE UI (if exists)
+--------------------------------------------------
 pcall(function()
-    for _,v in ipairs(Lighting:GetChildren()) do
-        if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") then
-            v:Destroy()
+    if localPlayer and localPlayer:FindFirstChild("PlayerGui") then
+        local gui = localPlayer.PlayerGui
+        for _, child in ipairs(gui:GetChildren()) do
+            if type(child.Name) == "string" and (child.Name:lower():find("impossible") or child.Name:match("Impossible")) then
+                pcall(function() child:Destroy() end)
+            end
         end
     end
 end)
 
--- ===========================
--- Load Hardcore V4 (attempt)
--- ===========================
+--------------------------------------------------
+-- 4) INTRO UI + MESSAGE "THE OVERDOORS" + "OVERDOORS by chu be te liet"
+--------------------------------------------------
 pcall(function()
-    safeLoad("https://raw.githubusercontent.com/localplayerr/Doors-stuff/refs/heads/main/Hardcore%20v4%20recreate/main%20code")
+    if not localPlayer then return end
+    local gui = localPlayer:WaitForChild("PlayerGui", 5) or localPlayer:FindFirstChild("PlayerGui")
+    if not gui then return end
+
+    -- create ScreenGui
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "OVERDOORS_INTRO"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.Parent = gui
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.fromScale(1, 0.18)
+    title.Position = UDim2.fromScale(0, 0.40)
+    title.BackgroundTransparency = 1
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBlack
+    title.TextColor3 = Color3.fromRGB(255, 120, 20)
+    title.TextStrokeTransparency = 0
+    title.Text = "THE OVERDOORS"
+    title.Parent = sg
+
+    -- small subtitle
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.fromScale(1, 0.08)
+    sub.Position = UDim2.fromScale(0, 0.58)
+    sub.BackgroundTransparency = 1
+    sub.TextScaled = true
+    sub.Font = Enum.Font.Gotham
+    sub.TextColor3 = Color3.fromRGB(200,200,200)
+    sub.Text = "OVERDOORS by chu be te liet"
+    sub.Parent = sg
+
+    -- tween fade in/out
+    title.TextTransparency = 1
+    sub.TextTransparency = 1
+    TweenService:Create(title, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+    TweenService:Create(sub, TweenInfo.new(1.0, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+    task.delay(4.0, function()
+        TweenService:Create(title, TweenInfo.new(0.8), {TextTransparency = 1}):Play()
+        TweenService:Create(sub, TweenInfo.new(0.8), {TextTransparency = 1}):Play()
+        task.wait(0.85)
+        pcall(function() sg:Destroy() end)
+    end)
 end)
 
--- ===========================
--- Ambience sound (cave)
--- ===========================
+--------------------------------------------------
+-- 5) PLAY VIOLET MUSIC ONCE AT START (asset id provided)
+--------------------------------------------------
 pcall(function()
-    if not Workspace:FindFirstChild("OVERDOORS_AMB") then
+    if SoundService:FindFirstChild("OVERDOORS_VIOLET") then
+        -- if existing, try restart
+        local s = SoundService.OVERDOORS_VIOLET
+        if s and s:IsA("Sound") then
+            pcall(function() s:Play() end)
+            return
+        end
+    end
+
+    local music = Instance.new("Sound")
+    music.Name = "OVERDOORS_VIOLET"
+    music.SoundId = "rbxassetid://76760458012018" -- Violet
+    music.Volume = 2
+    music.Looped = false
+    music.Parent = SoundService
+    pcall(function() music:Play() end)
+end)
+
+--------------------------------------------------
+-- 6) CAVE AMBIENCE (workspace sound)
+--------------------------------------------------
+pcall(function()
+    if workspace:FindFirstChild("OVERDOORS_CAVE_AMBIENCE") then
+        -- leave if exists
+    else
         local amb = Instance.new("Sound")
-        amb.Name = "OVERDOORS_AMB"
+        amb.Name = "OVERDOORS_CAVE_AMBIENCE"
         amb.SoundId = "rbxassetid://8734471313"
         amb.Volume = 3
         amb.Looped = true
-        amb.Parent = Workspace
+        amb.Parent = workspace
         pcall(function() amb:Play() end)
     end
 end)
 
--- ===========================
--- Lighting: dark + cartoon-ish color correction + light bloom (tuned for dark mood)
--- ===========================
-pcall(function()
-    -- Dark environment baseline (hardcore mood)
-    Lighting.Ambient = Color3.new(0, 0, 0)
-    Lighting.FogColor = Color3.new(0, 0, 0)
-    Lighting.FogStart = 25
-    Lighting.FogEnd = 55
-    Lighting.Brightness = 0.08        -- keep scene dark
-    Lighting.GlobalShadows = true
-    Lighting.ShadowSoftness = 0.4
-    Lighting.ExposureCompensation = -0.15  -- slightly darker
+--------------------------------------------------
+-- 7) SET PLAYER RUN SPEED = 20 (local)
+--------------------------------------------------
+do
+    local function applySpeedToCharacter(character)
+        if not character then return end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            pcall(function() humanoid.WalkSpeed = 20 end)
+        end
+    end
 
-    -- Set night time for ambience
-    pcall(function() Lighting.ClockTime = 2 end)                           
-    cc.Name = "OVERDOORS_CC"
-    cc.Contrast = 0.28      -- subtle
-    cc.Saturation = 0.25    -- slightly desaturated so it's moody cartoon
-    cc.Brightness = 0.02    -- tiny bump, but overall lighting stays dark
-    cc.Parent = Lighting
-
-    -- Bloom (light, to soften highlights)
-    local bloom = Instance.new("BloomEffect")
-    bloom.Name = "OVERDOORS_BLOOM"
-    bloom.Intensity = 0.45
-    bloom.Size = 24
-    bloom.Threshold = 1.1
-    bloom.Parent = Lighting
-end)
-
--- ===========================
--- Keep player speed stable at 20
--- ===========================
-task.spawn(function()
-    while task.wait(1.5) do
-        pcall(function()
-            if LP and LP.Character then
-                local h = LP.Character:FindFirstChildOfClass("Humanoid")
-                if h then
-                    h.WalkSpeed = 20
-                    -- optional: keep JumpPower safe
-                    if h.JumpPower and type(h.JumpPower) == "number" then
-                        h.JumpPower = 32
-                    end
-                end
+    -- apply to current character
+    if localPlayer then
+        if localPlayer.Character then
+            applySpeedToCharacter(localPlayer.Character)
+        end
+        -- CharacterAdded handler
+        localPlayer.CharacterAdded:Connect(function(char)
+            -- wait for humanoid
+            local hum = char:WaitForChild("Humanoid", 5)
+            if hum then
+                pcall(function() hum.WalkSpeed = 20 end)
+            else
+                applySpeedToCharacter(char)
             end
         end)
     end
-end)
+end
 
-LP.CharacterAdded:Connect(function(char)
-    task.wait(1)
-    pcall(function()
-        local hum = char:WaitForChild("Humanoid",3)
-        if hum then hum.WalkSpeed = 20 end
-    end)
-end)
-
--- ===========================
--- Screech/Hide/Spider fix (no UI break)
--- ===========================
+--------------------------------------------------
+-- 8) MODIFY SCREECH / HIDE / SPIDER SOUNDS & EYES (no UI)
+--------------------------------------------------
 pcall(function()
-    local gui = LP:WaitForChild("PlayerGui", 5)
-    if gui and gui:FindFirstChild("MainUI") then
-        local ok, G = pcall(function()
-            return gui.MainUI.Initiator.Main_Game.RemoteListener.Modules
-        end)
-        if ok and G then
-            pcall(function()
-                if G.Screech and G.Screech.Caught then
-                    G.Screech.Caught.SoundId = "rbxassetid://7492033495"
-                    G.Screech.Caught.PlaybackSpeed = 1.6
+    -- Need PlayerGui.MainUI.Initiator.Main_Game present
+    if not localPlayer then return end
+    local pg = localPlayer:WaitForChild("PlayerGui", 5)
+    if not pg then return end
+    local mainUi = pg:FindFirstChild("MainUI")
+    if mainUi then
+        local initiator = mainUi:FindFirstChild("Initiator")
+        if initiator then
+            local mainGame = initiator:FindFirstChild("Main_Game")
+            if mainGame then
+                local success, err = pcall(function()
+                    -- Screech eyes
+                    if RS and RS:FindFirstChild("Entities") and RS.Entities:FindFirstChild("Screech") then
+                        local top = RS.Entities.Screech:FindFirstChild("Top")
+                        if top and top:FindFirstChild("Eyes") then
+                            top.Eyes.Color = Color3.fromRGB(255,255,0)
+                        end
+                    end
+
+                    -- Remote modules under Main_Game
+                    local remote = mainGame:FindFirstChild("RemoteListener")
+                    if remote and remote:FindFirstChild("Modules") then
+                        local mods = remote.Modules
+                        if mods:FindFirstChild("Screech") and mods.Screech:FindFirstChild("Caught") then
+                            local caught = mods.Screech.Caught
+                            if pcall(function() caught.SoundId = "rbxassetid://7492033495" end) then end
+                            if pcall(function() caught.PlaybackSpeed = 1.6 end) then end
+                        end
+                        if mods:FindFirstChild("Screech") and mods.Screech:FindFirstChild("Attack") then
+                            pcall(function() mods.Screech.Attack.SoundId = "rbxassetid://8080941676" end)
+                        end
+                        if mods:FindFirstChild("HideMonster") and mods.HideMonster:FindFirstChild("Scare") then
+                            pcall(function() mods.HideMonster.Scare.SoundId = "rbxassetid://9126213741" end)
+                        end
+                        if mods:FindFirstChild("SpiderJumpscare") and mods.SpiderJumpscare:FindFirstChild("Scare") then
+                            pcall(function() mods.SpiderJumpscare.Scare.SoundId = "rbxassetid://8080941676" end)
+                        end
+                    end
+                end)
+                if not success then
+                    -- ignore
                 end
-                if G.Screech and G.Screech.Attack then
-                    G.Screech.Attack.SoundId = "rbxassetid://8080941676"
-                end
-                if G.HideMonster and G.HideMonster.Scare then
-                    G.HideMonster.Scare.SoundId = "rbxassetid://9126213741"
-                end
-                if G.SpiderJumpscare and G.SpiderJumpscare.Scare then
-                    G.SpiderJumpscare.Scare.SoundId = "rbxassetid://8080941676"
-                end
-            end)
+            end
         end
     end
 end)
 
--- ===========================
--- Caption filter: block only "impossible" texts; keep other captions (like Hardcore)
--- ===========================
-task.spawn(function()
-    local gui = LP:WaitForChild("PlayerGui", 10)
-    if not gui then return end
-    local function onDescAdded(obj)
-        pcall(function()
-            if not (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then return end
-            local txt = tostring(obj.Text or "")
-            if string.find(string.lower(txt), "impossible") then
-                obj.Visible = false
-            end
-        end)
-    end
-    for _,v in pairs(gui:GetDescendants()) do
-        onDescAdded(v)
-    end
-    gui.DescendantAdded:Connect(onDescAdded)
-end)
-
--- ===========================
--- Entity spawn helper (safe)
--- ===========================
+--------------------------------------------------
+-- 9) HELPER: spawnLoop wrapper for entity loadstrings
+--------------------------------------------------
 local function spawnLoop(delayTime, url, waitRoom)
     task.spawn(function()
         while true do
             task.wait(delayTime)
-            if waitRoom and RS:FindFirstChild("GameData") and RS.GameData:FindFirstChild("LatestRoom") then
-                RS.GameData.LatestRoom.Changed:Wait()
+            if waitRoom and RS and RS:FindFirstChild("GameData") and RS.GameData:FindFirstChild("LatestRoom") then
+                -- wait for LatestRoom change (robust)
+                local ok, val = pcall(function() RS.GameData.LatestRoom.Changed:Wait() end)
             end
-            pcall(function() safeLoad(url) end)
+            pcall(function()
+                local s, r = pcall(function()
+                    local code = game:HttpGet(url)
+                    if code and #code > 5 then
+                        loadstring(code)()
+                    end
+                end)
+            end)
         end
     end)
 end
 
--- ===========================
--- Entities (same schedule as before)
--- ===========================
-spawnLoop(90,  "https://raw.githubusercontent.com/Junbbinopro/Depth-entity/refs/heads/main/Depth", true)
-spawnLoop(150, "https://raw.githubusercontent.com/Junbbinopro/Guardian-entity/refs/heads/main/Guardian", true)
-spawnLoop(190, "https://raw.githubusercontent.com/Junbbinopro/Wh1t3/refs/heads/main/Entity", true)
-spawnLoop(215, "https://raw.githubusercontent.com/trungdepth-dot/Entity-greance/refs/heads/main/Greance-20", true)
-spawnLoop(250, "https://raw.githubusercontent.com/trungdepth-dot/Entity-surge/refs/heads/main/Surge-20", true)
-spawnLoop(280, "https://raw.githubusercontent.com/trungdepth-dot/Him-entity-doors/refs/heads/main/Him", true)
-spawnLoop(325, "https://pastefy.app/ofutwkjb/raw", true)
-spawnLoop(35,  "https://raw.githubusercontent.com/vct0721/Doors-Stuff/refs/heads/main/Entities/Shocker", false)
-spawnLoop(350, "https://github.com/PABMAXICHAC/doors-monsters-scripts/raw/main/blinkcrux", true)
-spawnLoop(550, "https://raw.githubusercontent.com/trungdepth-dot/Entity-greed/refs/heads/main/Greed-update", true)
-spawnLoop(320, "https://raw.githubusercontent.com/Junbbinopro/Black-smile/refs/heads/main/Black", true)
-spawnLoop(600, "https://raw.githubusercontent.com/Junbbinopro/Munci-entity/refs/heads/main/Munci-20", true)
-spawnLoop(440, "https://raw.githubusercontent.com/Junbbinopro/Blue-face/refs/heads/main/Entity", true)
-spawnLoop(620, "https://raw.githubusercontent.com/Junbbinopro/Hungerd/refs/heads/main/Entity", true)
-spawnLoop(210, "https://raw.githubusercontent.com/Junbbinopro/200-entity/refs/heads/main/Entity", true)
-spawnLoop(290, "https://raw.githubusercontent.com/trungdepth-dot/Entity-bluyer/refs/heads/main/Entity-20", true)
-spawnLoop(230, "https://raw.githubusercontent.com/Junbbinopro/Trauma-entity/refs/heads/main/Trauma", true)
+--------------------------------------------------
+-- 10) LOAD HARDCORE V4 (keep it)
+--------------------------------------------------
+pcall(function()
+    loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/localplayerr/Doors-stuff/refs/heads/main/Hardcore%20v4%20recreate/main%20code"
+    ))()
+end)
 
--- ===========================
--- Sprint + Guiding Light Candle (safe load)
--- ===========================
-safeLoad("https://raw.githubusercontent.com/Junbbinopro/Guiding-light-candle/refs/heads/main/Candle")
+--------------------------------------------------
+-- 11) ENTITY SPAWNS (safe pcall)
+--------------------------------------------------
+-- NOTE: if you want to change intervals/url, edit below
+pcall(function()
+    spawnLoop(90,  "https://raw.githubusercontent.com/Junbbinopro/Depth-entity/refs/heads/main/Depth", true)
+    spawnLoop(150, "https://raw.githubusercontent.com/Junbbinopro/Guardian-entity/refs/heads/main/Guardian", true)
+    spawnLoop(190, "https://raw.githubusercontent.com/Junbbinopro/Wh1t3/refs/heads/main/Entity", true)
+    spawnLoop(215, "https://raw.githubusercontent.com/trungdepth-dot/Entity-greance/refs/heads/main/Greance-20", true)
+    spawnLoop(250, "https://raw.githubusercontent.com/trungdepth-dot/Entity-surge/refs/heads/main/Surge-20", true)
+    spawnLoop(280, "https://raw.githubusercontent.com/trungdepth-dot/Him-entity-doors/refs/heads/main/Him", true)
+    spawnLoop(325, "https://pastefy.app/ofutwkjb/raw", true)
+    spawnLoop(35,  "https://raw.githubusercontent.com/vct0721/Doors-Stuff/refs/heads/main/Entities/Shocker", false)
+    spawnLoop(350, "https://github.com/PABMAXICHAC/doors-monsters-scripts/raw/main/blinkcrux", true)
+    spawnLoop(550, "https://raw.githubusercontent.com/trungdepth-dot/Entity-greed/refs/heads/main/Greed-update", true)
+    spawnLoop(320, "https://raw.githubusercontent.com/Junbbinopro/Black-smile/refs/heads/main/Black", true)
+    spawnLoop(600, "https://raw.githubusercontent.com/Junbbinopro/Munci-entity/refs/heads/main/Munci-20", true)
+    spawnLoop(440, "https://raw.githubusercontent.com/Junbbinopro/Blue-face/refs/heads/main/Entity", true)
+    spawnLoop(620, "https://raw.githubusercontent.com/Junbbinopro/Hungerd/refs/heads/main/Entity", true)
+    spawnLoop(210, "https://raw.githubusercontent.com/Junbbinopro/200-entity/refs/heads/main/Entity", true)
+    spawnLoop(290, "https://raw.githubusercontent.com/trungdepth-dot/Entity-bluyer/refs/heads/main/Entity-20", true)
+    spawnLoop(230, "https://raw.githubusercontent.com/Junbbinopro/Trauma-entity/refs/heads/main/Trauma", true)
+end)
 
--- ===========================
--- Final log
--- ===========================
+--------------------------------------------------
+-- 12) SPRINT + GUIDING LIGHT CANDLE (re-load safely to avoid being missing)
+--------------------------------------------------
+pcall(function()
+    -- Sprint
+    pcall(function()
+        local code = game:HttpGet("https://raw.githubusercontent.com/Junbbinopro/Sprint-stamina-v2/refs/heads/main/Sprint")
+        if code and #code > 5 then
+            loadstring(code)()
+        end
+    end)
+
+    -- Guiding Light Candle
+    pcall(function()
+        local code2 = game:HttpGet("https://raw.githubusercontent.com/Junbbinopro/Guiding-light-candle/refs/heads/main/Candle")
+        if code2 and #code2 > 5 then
+            loadstring(code2)()
+        end
+    end)
+end)
+
+--------------------------------------------------
+-- 13) OPTIONAL: show Hardcore caption if present (do not remove)
+-- We will try to re-display Hardcore message if it's missing (best-effort)
+--------------------------------------------------
+pcall(function()
+    -- Try to call the Doors caption function if present
+    if localPlayer then
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        if pg and pg:FindFirstChild("MainUI") then
+            local initiator = pg.MainUI:FindFirstChild("Initiator")
+            if initiator and initiator:FindFirstChild("Main_Game") then
+                local ok, mainGame = pcall(function() return require(initiator.Main_Game) end)
+                if ok and type(mainGame) == "table" and mainGame.caption then
+                    pcall(function()
+                        -- show small startup caption (not to override Hardcore)
+                        mainGame.caption("script OVERDOORS BY chu be te liet", true)
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+--------------------------------------------------
+-- 14) FINAL: cleanup hints & safety
+--------------------------------------------------
+-- remove any leftover "SCREENGUI" duplicates we created earlier on re-run
+pcall(function()
+    if localPlayer and localPlayer:FindFirstChild("PlayerGui") then
+        local gui = localPlayer.PlayerGui
+        for _, child in ipairs(gui:GetChildren()) do
+            if child:IsA("ScreenGui") and child.Name == "OVERDOORS_INTRO" and child:GetAttribute("created_by_combiner") ~= true then
+                -- nothing - we already created one and set ResetOnSpawn=false; keep it minimal
+            end
+        end
+    end
+end)
+
+-- done
+print("[OVERDOORS] Combined script loaded. Enjoy (and be careful).")
