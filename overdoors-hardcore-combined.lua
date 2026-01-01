@@ -74,10 +74,7 @@ pcall(function()
     Lighting.ExposureCompensation = -0.15  -- slightly darker
 
     -- Set night time for ambience
-    pcall(function() Lighting.ClockTime = 2 end)
-
-    -- Cartoon-style Color Correction (subtle, preserves darkness)
-    local cc = Instance.new("ColorCorrectionEffect")
+    pcall(function() Lighting.ClockTime = 2 end)                           
     cc.Name = "OVERDOORS_CC"
     cc.Contrast = 0.28      -- subtle
     cc.Saturation = 0.25    -- slightly desaturated so it's moody cartoon
