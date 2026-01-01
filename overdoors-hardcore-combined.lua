@@ -210,7 +210,6 @@ spawnLoop(230, "https://raw.githubusercontent.com/Junbbinopro/Trauma-entity/refs
 -- ===========================
 -- Sprint + Guiding Light Candle (safe load)
 -- ===========================
-safeLoad("https://raw.githubusercontent.com/Junbbinopro/Sprint-stamina-v2/refs/heads/main/Sprint")
 safeLoad("https://raw.githubusercontent.com/Junbbinopro/Guiding-light-candle/refs/heads/main/Candle")
 
 -- ===========================
